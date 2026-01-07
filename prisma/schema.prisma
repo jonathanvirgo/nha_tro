@@ -1,0 +1,533 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============== ENUMS ==============
+
+enum Role {
+  ADMIN
+  LANDLORD
+  TENANT
+  STAFF
+  USER
+}
+
+enum MotelStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum RoomStatus {
+  AVAILABLE
+  RENTED
+  MAINTENANCE
+  RESERVED
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  FAMILY
+  STUDIO
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ServiceType {
+  FIXED
+  USAGE
+  PEOPLE
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  PENDING
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOMO
+  VNPAY
+  ZALOPAY
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+  CONVERTED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum NotificationType {
+  INVOICE_CREATED
+  INVOICE_DUE
+  INVOICE_OVERDUE
+  PAYMENT_RECEIVED
+  CONTRACT_EXPIRING
+  CONTRACT_EXPIRED
+  APPOINTMENT_NEW
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  MAINTENANCE_NEW
+  MAINTENANCE_UPDATE
+  MAINTENANCE_COMPLETED
+  ANNOUNCEMENT
+  SYSTEM
+}
+
+// ============== MODELS ==============
+
+model User {
+  id                String    @id @default(uuid()) @db.Uuid
+  email             String    @unique
+  password          String?   // Hashed password (null if using OAuth)
+  phone             String?
+  fullName          String?   @map("full_name")
+  role              Role      @default(USER)
+  avatarUrl         String?   @map("avatar_url")
+  identityCard      String?   @map("identity_card")
+  identityCardFront String?   @map("identity_card_front")
+  identityCardBack  String?   @map("identity_card_back")
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  gender            String?
+  permanentAddress  String?   @map("permanent_address")
+  occupation        String?
+  workplace         String?
+  emailVerified     Boolean   @default(false) @map("email_verified")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  ownedMotels         Motel[]
+  staffAssignments    StaffAssignment[]
+  contracts           Contract[]           @relation("TenantContracts")
+  reservations        Reservation[]
+  appointments        Appointment[]
+  maintenanceRequests MaintenanceRequest[] @relation("Requester")
+  assignedMaintenance MaintenanceRequest[] @relation("Assignee")
+  reviews             Review[]
+  notifications       Notification[]
+  sentMessages        Message[]            @relation("Sender")
+  receivedMessages    Message[]            @relation("Receiver")
+  payments            Payment[]
+
+  @@map("users")
+}
+
+model Motel {
+  id          String      @id @default(uuid()) @db.Uuid
+  ownerId     String      @map("owner_id") @db.Uuid
+  name        String
+  address     String
+  province    String?
+  district    String?
+  ward        String?
+  latitude    Float?
+  longitude   Float?
+  description String?     @db.Text
+  totalFloors Int?        @default(1) @map("total_floors")
+  totalRooms  Int?        @default(0) @map("total_rooms")
+  status      MotelStatus @default(ACTIVE)
+  rules       String?     @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  rooms            Room[]
+  services         Service[]
+  reviews          Review[]
+  images           MotelImage[]
+  staffAssignments StaffAssignment[]
+
+  @@map("motels")
+}
+
+model MotelImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  motelId   String   @map("motel_id") @db.Uuid
+  imageUrl  String   @map("image_url")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  motel Motel @relation(fields: [motelId], references: [id], onDelete: Cascade)
+
+  @@map("motel_images")
+}
+
+model StaffAssignment {
+  id          String   @id @default(uuid()) @db.Uuid
+  motelId     String   @map("motel_id") @db.Uuid
+  staffId     String   @map("staff_id") @db.Uuid
+  permissions Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  motel Motel @relation(fields: [motelId], references: [id], onDelete: Cascade)
+  staff User  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([motelId, staffId])
+  @@map("staff_assignments")
+}
+
+model Room {
+  id            String     @id @default(uuid()) @db.Uuid
+  motelId       String     @map("motel_id") @db.Uuid
+  name          String
+  floor         Int?       @default(1)
+  area          Float?
+  roomType      RoomType   @default(SINGLE) @map("room_type")
+  price         Float
+  deposit       Float?     @default(0)
+  maxTenants    Int?       @default(2) @map("max_tenants")
+  status        RoomStatus @default(AVAILABLE)
+  description   String?    @db.Text
+  availableFrom DateTime?  @map("available_from") @db.Date
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  motel               Motel                @relation(fields: [motelId], references: [id], onDelete: Cascade)
+  contracts           Contract[]
+  reservations        Reservation[]
+  appointments        Appointment[]
+  roomServices        RoomService[]
+  images              RoomImage[]
+  utilities           RoomUtility[]
+  maintenanceRequests MaintenanceRequest[]
+  reviews             Review[]
+
+  @@map("rooms")
+}
+
+model RoomImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  imageUrl  String   @map("image_url")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("room_images")
+}
+
+model Utility {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  icon      String?
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  rooms RoomUtility[]
+
+  @@map("utilities")
+}
+
+model RoomUtility {
+  roomId    String @map("room_id") @db.Uuid
+  utilityId String @map("utility_id") @db.Uuid
+
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  utility Utility @relation(fields: [utilityId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, utilityId])
+  @@map("room_utilities")
+}
+
+model Appointment {
+  id              String            @id @default(uuid()) @db.Uuid
+  roomId          String            @map("room_id") @db.Uuid
+  userId          String?           @map("user_id") @db.Uuid
+  guestName       String?           @map("guest_name")
+  guestPhone      String?           @map("guest_phone")
+  guestEmail      String?           @map("guest_email")
+  visitDate       DateTime          @map("visit_date")
+  status          AppointmentStatus @default(PENDING)
+  note            String?
+  cancelledReason String?           @map("cancelled_reason")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("appointments")
+}
+
+model Service {
+  id         String      @id @default(uuid()) @db.Uuid
+  motelId    String      @map("motel_id") @db.Uuid
+  name       String
+  price      Float
+  unit       String?
+  type       ServiceType @default(FIXED)
+  isRequired Boolean     @default(true) @map("is_required")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  motel        Motel         @relation(fields: [motelId], references: [id], onDelete: Cascade)
+  roomServices RoomService[]
+
+  @@map("services")
+}
+
+model RoomService {
+  roomId      String @map("room_id") @db.Uuid
+  serviceId   String @map("service_id") @db.Uuid
+  customPrice Float? @map("custom_price")
+
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, serviceId])
+  @@map("room_services")
+}
+
+model Contract {
+  id                String         @id @default(uuid()) @db.Uuid
+  contractNumber    String?        @unique @map("contract_number")
+  roomId            String         @map("room_id") @db.Uuid
+  tenantId          String?        @map("tenant_id") @db.Uuid
+  startDate         DateTime       @map("start_date") @db.Date
+  endDate           DateTime?      @map("end_date") @db.Date
+  durationMonths    Int?           @map("duration_months")
+  rentPrice         Float          @map("rent_price")
+  depositAmount     Float?         @map("deposit_amount")
+  paymentDueDay     Int?           @default(5) @map("payment_due_day")
+  status            ContractStatus @default(ACTIVE)
+  contractFileUrl   String?        @map("contract_file_url")
+  signedDate        DateTime?      @map("signed_date") @db.Date
+  terminationDate   DateTime?      @map("termination_date") @db.Date
+  terminationReason String?        @map("termination_reason")
+  notes             String?
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  room     Room      @relation(fields: [roomId], references: [id])
+  tenant   User?     @relation("TenantContracts", fields: [tenantId], references: [id])
+  tenants  Tenant[]
+  invoices Invoice[]
+
+  @@map("contracts")
+}
+
+model Tenant {
+  id                String    @id @default(uuid()) @db.Uuid
+  contractId        String    @map("contract_id") @db.Uuid
+  fullName          String    @map("full_name")
+  phone             String?
+  email             String?
+  identityCard      String?   @map("identity_card")
+  identityCardFront String?   @map("identity_card_front")
+  identityCardBack  String?   @map("identity_card_back")
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  gender            String?
+  relationship      String?
+  isPrimary         Boolean   @default(false) @map("is_primary")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@map("tenants")
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  invoiceNumber String?       @unique @map("invoice_number")
+  contractId    String        @map("contract_id") @db.Uuid
+  billingMonth  DateTime      @map("billing_month") @db.Date
+  amountTotal   Float         @map("amount_total")
+  amountPaid    Float         @default(0) @map("amount_paid")
+  status        InvoiceStatus @default(UNPAID)
+  dueDate       DateTime?     @map("due_date") @db.Date
+  paidDate      DateTime?     @map("paid_date") @db.Date
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  contract Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  invoiceId   String  @map("invoice_id") @db.Uuid
+  serviceName String  @map("service_name")
+  quantity    Float
+  unitPrice   Float   @map("unit_price")
+  totalPrice  Float   @map("total_price")
+  oldIndex    Float?  @map("old_index")
+  newIndex    Float?  @map("new_index")
+  notes       String?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  invoiceId     String        @map("invoice_id") @db.Uuid
+  amount        Float
+  paymentMethod PaymentMethod @map("payment_method")
+  paymentDate   DateTime      @default(now()) @map("payment_date")
+  transactionId String?       @map("transaction_id")
+  receiptUrl    String?       @map("receipt_url")
+  notes         String?
+  createdById   String?       @map("created_by") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id])
+
+  @@map("payments")
+}
+
+model Reservation {
+  id                   String            @id @default(uuid()) @db.Uuid
+  roomId               String            @map("room_id") @db.Uuid
+  userId               String?           @map("user_id") @db.Uuid
+  guestName            String?           @map("guest_name")
+  guestPhone           String?           @map("guest_phone")
+  guestEmail           String?           @map("guest_email")
+  intendedStartDate    DateTime?         @map("intended_start_date") @db.Date
+  depositAmount        Float             @map("deposit_amount")
+  status               ReservationStatus @default(PENDING)
+  paymentTransactionId String?           @map("payment_transaction_id")
+  expiresAt            DateTime?         @map("expires_at")
+  confirmedAt          DateTime?         @map("confirmed_at")
+  cancelledAt          DateTime?         @map("cancelled_at")
+  cancellationReason   String?           @map("cancellation_reason")
+  createdAt            DateTime          @default(now()) @map("created_at")
+
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("reservations")
+}
+
+model MaintenanceRequest {
+  id               String              @id @default(uuid()) @db.Uuid
+  roomId           String              @map("room_id") @db.Uuid
+  requesterId      String              @map("requester_id") @db.Uuid
+  title            String
+  description      String?
+  priority         MaintenancePriority @default(MEDIUM)
+  status           MaintenanceStatus   @default(PENDING)
+  images           String[]
+  estimatedCost    Float?              @map("estimated_cost")
+  actualCost       Float?              @map("actual_cost")
+  costPaidBy       String?             @map("cost_paid_by")
+  assignedToId     String?             @map("assigned_to") @db.Uuid
+  startedAt        DateTime?           @map("started_at")
+  completedAt      DateTime?           @map("completed_at")
+  completionNotes  String?             @map("completion_notes")
+  completionImages String[]            @map("completion_images")
+  rating           Int?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  room       Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  requester  User  @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  assignedTo User? @relation("Assignee", fields: [assignedToId], references: [id])
+
+  @@map("maintenance_requests")
+}
+
+model Review {
+  id                String   @id @default(uuid()) @db.Uuid
+  motelId           String   @map("motel_id") @db.Uuid
+  roomId            String?  @map("room_id") @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  overallRating     Int      @map("overall_rating")
+  locationRating    Int?     @map("location_rating")
+  priceRating       Int?     @map("price_rating")
+  cleanlinessRating Int?     @map("cleanliness_rating")
+  landlordRating    Int?     @map("landlord_rating")
+  amenitiesRating   Int?     @map("amenities_rating")
+  content           String?
+  images            String[]
+  isVerifiedTenant  Boolean  @default(false) @map("is_verified_tenant")
+  rentalDuration    String?  @map("rental_duration")
+  isVisible         Boolean  @default(true) @map("is_visible")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  motel Motel @relation(fields: [motelId], references: [id], onDelete: Cascade)
+  room  Room? @relation(fields: [roomId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  content   String?
+  data      Json             @default("{}")
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Message {
+  id          String    @id @default(uuid()) @db.Uuid
+  senderId    String    @map("sender_id") @db.Uuid
+  receiverId  String    @map("receiver_id") @db.Uuid
+  content     String
+  messageType String    @default("text") @map("message_type")
+  attachments String[]
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  sender   User @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
