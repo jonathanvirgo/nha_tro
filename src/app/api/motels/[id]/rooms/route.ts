@@ -4,12 +4,12 @@ import { withAuth } from '@/lib/auth';
 import { createRoomSchema } from '@/lib/validators';
 import { ZodError } from 'zod';
 
-type RouteParams = { params: Promise<{ motelId: string }> };
+type RouteParams = { params: Promise<{ id: string }> };
 
-// GET /api/motels/[motelId]/rooms - List rooms in a motel
+// GET /api/motels/[id]/rooms - List rooms in a motel
 export async function GET(request: Request, { params }: RouteParams) {
     try {
-        const { motelId } = await params;
+        const { id: motelId } = await params;
         const { searchParams } = new URL(request.url);
 
         const status = searchParams.get('status');
@@ -79,13 +79,13 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 }
 
-// POST /api/motels/[motelId]/rooms - Create a new room
+// POST /api/motels/[id]/rooms - Create a new room
 export async function POST(request: Request, { params }: RouteParams) {
     try {
         const { user, error } = await withAuth(request, ['LANDLORD', 'STAFF', 'ADMIN']);
         if (error) return error;
 
-        const { motelId } = await params;
+        const { id: motelId } = await params;
 
         // Verify motel exists and user has access
         const motel = await prisma.motel.findUnique({

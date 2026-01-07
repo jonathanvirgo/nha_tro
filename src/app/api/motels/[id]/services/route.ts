@@ -4,12 +4,12 @@ import { withAuth } from '@/lib/auth';
 import { createServiceSchema } from '@/lib/validators';
 import { ZodError } from 'zod';
 
-type RouteParams = { params: Promise<{ motelId: string }> };
+type RouteParams = { params: Promise<{ id: string }> };
 
-// GET /api/motels/[motelId]/services - List services for a motel
+// GET /api/motels/[id]/services - List services for a motel
 export async function GET(request: Request, { params }: RouteParams) {
     try {
-        const { motelId } = await params;
+        const { id: motelId } = await params;
 
         const services = await prisma.service.findMany({
             where: { motelId },
@@ -32,13 +32,13 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 }
 
-// POST /api/motels/[motelId]/services - Create a new service
+// POST /api/motels/[id]/services - Create a new service
 export async function POST(request: Request, { params }: RouteParams) {
     try {
         const { user, error } = await withAuth(request, ['LANDLORD', 'STAFF', 'ADMIN']);
         if (error) return error;
 
-        const { motelId } = await params;
+        const { id: motelId } = await params;
 
         // Verify motel access
         const motel = await prisma.motel.findUnique({

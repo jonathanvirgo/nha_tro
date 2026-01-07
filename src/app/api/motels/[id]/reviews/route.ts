@@ -4,12 +4,12 @@ import { withAuth } from '@/lib/auth';
 import { createReviewSchema } from '@/lib/validators';
 import { ZodError } from 'zod';
 
-type RouteParams = { params: Promise<{ motelId: string }> };
+type RouteParams = { params: Promise<{ id: string }> };
 
-// GET /api/motels/[motelId]/reviews - List reviews for a motel
+// GET /api/motels/[id]/reviews - List reviews for a motel
 export async function GET(request: Request, { params }: RouteParams) {
     try {
-        const { motelId } = await params;
+        const { id: motelId } = await params;
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '10');
@@ -69,13 +69,13 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 }
 
-// POST /api/motels/[motelId]/reviews - Create a review
+// POST /api/motels/[id]/reviews - Create a review
 export async function POST(request: Request, { params }: RouteParams) {
     try {
         const { user, error } = await withAuth(request, ['TENANT', 'USER']);
         if (error) return error;
 
-        const { motelId } = await params;
+        const { id: motelId } = await params;
         const body = await request.json();
         const validated = createReviewSchema.parse(body);
 
