@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,8 +33,29 @@ import {
     Locate,
     Navigation,
     Route,
+    Loader2,
 } from 'lucide-react';
-import { mockProperties, mockRooms, districts, Property } from '@/data/mockData';
+
+// Static districts
+const districts = [
+    'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5',
+    'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10',
+    'Quận 11', 'Quận 12', 'Quận Bình Thạnh', 'Quận Gò Vấp',
+    'Quận Phú Nhuận', 'Quận Tân Bình', 'Quận Thủ Đức',
+];
+
+interface Property {
+    id: string;
+    name: string;
+    address: string;
+    district?: string;
+    latitude: number;
+    longitude: number;
+    rating?: number;
+    availableRooms?: number;
+    images?: any[];
+    rooms?: any[];
+}
 
 // Calculate distance between two coordinates (Haversine formula)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -47,10 +70,12 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
     return R * c;
 };
 
-const getPropertyMinPrice = (propertyId: string): number => {
-    const propertyRooms = mockRooms.filter(room => room.propertyId === propertyId && room.isAvailable);
-    if (propertyRooms.length === 0) return 0;
-    return Math.min(...propertyRooms.map(room => room.price));
+const getPropertyMinPrice = (property: Property): number => {
+    const rooms = property.rooms || [];
+    if (rooms.length === 0) return 0;
+    const prices = rooms.filter((r: any) => r.status === 'AVAILABLE').map((r: any) => r.price);
+    if (prices.length === 0) return 0;
+    return Math.min(...prices);
 };
 
 const formatPrice = (price: number) => {
@@ -75,7 +100,32 @@ function MapPageContent() {
     const [isLocating, setIsLocating] = useState(false);
     const [isMapReady, setIsMapReady] = useState(false);
 
-    const filteredProperties = useMemo(() => mockProperties.filter((property) => {
+    // Fetch motels từ API
+    const { data: response, isLoading: isLoadingMotels } = useQuery({
+        queryKey: ['map-motels'],
+        queryFn: () => api.getMotels(),
+        staleTime: 60000,
+    });
+
+    // Convert motel data to Property format with default coords for HCM
+    const properties: Property[] = useMemo(() => {
+        const motels = Array.isArray(response?.data) ? response.data : [];
+        return motels.map((motel: any, index: number) => ({
+            id: motel.id,
+            name: motel.name,
+            address: motel.address || '',
+            district: motel.district || '',
+            // Generate random coords around HCM city for demo (since API may not have coords)
+            latitude: motel.latitude || (10.7769 + (Math.random() - 0.5) * 0.1),
+            longitude: motel.longitude || (106.6927 + (Math.random() - 0.5) * 0.1),
+            rating: motel.averageRating || 4.5,
+            availableRooms: motel.rooms?.filter((r: any) => r.status === 'AVAILABLE').length || 0,
+            images: motel.images || [],
+            rooms: motel.rooms || [],
+        }));
+    }, [response]);
+
+    const filteredProperties = useMemo(() => properties.filter((property: Property) => {
         const matchesSearch = !searchQuery ||
             property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             property.address.toLowerCase().includes(searchQuery.toLowerCase());
@@ -88,7 +138,7 @@ function MapPageContent() {
         }
 
         return matchesSearch && matchesDistrict && withinRadius;
-    }), [searchQuery, selectedDistrict, userLocation, searchRadius]);
+    }), [properties, searchQuery, selectedDistrict, userLocation, searchRadius]);
 
     const getUserLocation = () => {
         setIsLocating(true);
@@ -200,7 +250,7 @@ function MapPageContent() {
         markersRef.current = [];
 
         filteredProperties.forEach((property) => {
-            const minPrice = getPropertyMinPrice(property.id);
+            const minPrice = getPropertyMinPrice(property);
             const isSelected = selectedProperty?.id === property.id;
 
             const buildingIcon = L.divIcon({
@@ -318,13 +368,13 @@ function MapPageContent() {
                                             const distance = userLocation
                                                 ? calculateDistance(userLocation[0], userLocation[1], property.latitude, property.longitude)
                                                 : null;
-                                            const minPrice = getPropertyMinPrice(property.id);
+                                            const minPrice = getPropertyMinPrice(property);
 
                                             return (
                                                 <Card key={property.id} className="cursor-pointer hover:border-primary/50" onClick={() => handlePropertyClick(property)}>
                                                     <CardContent className="p-3">
                                                         <div className="flex gap-3">
-                                                            <img src={property.images[0]} alt={property.name} className="w-20 h-20 rounded-lg object-cover" />
+                                                            <img src={property.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200'} alt={property.name} className="w-20 h-20 rounded-lg object-cover" />
                                                             <div className="flex-1 min-w-0">
                                                                 <h4 className="font-medium text-sm line-clamp-1">{property.name}</h4>
                                                                 <p className="text-xs text-muted-foreground line-clamp-1">{property.district}</p>
@@ -366,7 +416,7 @@ function MapPageContent() {
                             </Button>
 
                             <div className="flex">
-                                <img src={selectedProperty.images[0]} alt={selectedProperty.name} className="w-32 h-32 object-cover rounded-l-lg" />
+                                <img src={selectedProperty.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200'} alt={selectedProperty.name} className="w-32 h-32 object-cover rounded-l-lg" />
                                 <div className="flex-1 p-3">
                                     <Badge className="mb-1 bg-green-500 text-xs">{selectedProperty.availableRooms} phòng trống</Badge>
                                     <h3 className="font-semibold text-sm line-clamp-1">{selectedProperty.name}</h3>
@@ -377,7 +427,7 @@ function MapPageContent() {
                                     <div className="flex items-center gap-2 mt-1">
                                         <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                         <span className="text-xs">{selectedProperty.rating}</span>
-                                        <span className="text-xs font-semibold text-primary">Từ {formatPrice(getPropertyMinPrice(selectedProperty.id))}đ</span>
+                                        <span className="text-xs font-semibold text-primary">Từ {formatPrice(getPropertyMinPrice(selectedProperty))}đ</span>
                                     </div>
                                     <div className="flex items-center gap-1.5 mt-2">
                                         <Button

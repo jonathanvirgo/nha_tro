@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || '';
 
 interface ApiResponse<T> {
     success: boolean;
@@ -195,7 +195,131 @@ class ApiClient {
     async markNotificationRead(id: string) {
         return this.request<unknown>(`/api/notifications/${id}`, { method: 'PUT', body: { isRead: true } });
     }
+
+    // Admin CRUD
+    async createMotel(data: unknown) {
+        return this.request<unknown>('/api/motels', { method: 'POST', body: data });
+    }
+
+    async updateMotel(id: string, data: unknown) {
+        return this.request<unknown>(`/api/motels/${id}`, { method: 'PUT', body: data });
+    }
+
+    async deleteMotel(id: string) {
+        return this.request<unknown>(`/api/motels/${id}`, { method: 'DELETE' });
+    }
+
+    async createRoom(motelId: string, data: unknown) {
+        return this.request<unknown>(`/api/motels/${motelId}/rooms`, { method: 'POST', body: data });
+    }
+
+    async updateRoom(id: string, data: unknown) {
+        return this.request<unknown>(`/api/rooms/${id}`, { method: 'PUT', body: data });
+    }
+
+    async deleteRoom(id: string) {
+        return this.request<unknown>(`/api/rooms/${id}`, { method: 'DELETE' });
+    }
+
+    // Tenants
+    async getTenants(params?: Record<string, unknown>) {
+        const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return this.request<unknown[]>(`/api/tenants${query}`);
+    }
+
+    async getTenant(id: string) {
+        return this.request<unknown>(`/api/users/${id}`);
+    }
+
+    async updateTenant(id: string, data: unknown) {
+        return this.request<unknown>(`/api/users/${id}`, { method: 'PUT', body: data });
+    }
+
+    // Contracts CRUD
+
+    async createContract(data: unknown) {
+        return this.request<unknown>('/api/contracts', { method: 'POST', body: data });
+    }
+
+    async updateContract(id: string, data: unknown) {
+        return this.request<unknown>(`/api/contracts/${id}`, { method: 'PUT', body: data });
+    }
+
+    async deleteContract(id: string) {
+        return this.request<unknown>(`/api/contracts/${id}`, { method: 'DELETE' });
+    }
+
+    // Invoices CRUD
+    async createInvoice(data: unknown) {
+        return this.request<unknown>('/api/invoices', { method: 'POST', body: data });
+    }
+
+    async updateInvoice(id: string, data: unknown) {
+        return this.request<unknown>(`/api/invoices/${id}`, { method: 'PUT', body: data });
+    }
+
+    async deleteInvoice(id: string) {
+        return this.request<unknown>(`/api/invoices/${id}`, { method: 'DELETE' });
+    }
+
+    // Maintenance CRUD
+    async updateMaintenanceRequest(id: string, data: unknown) {
+        return this.request<unknown>(`/api/maintenance-requests/${id}`, { method: 'PUT', body: data });
+    }
+
+    async deleteMaintenanceRequest(id: string) {
+        return this.request<unknown>(`/api/maintenance-requests/${id}`, { method: 'DELETE' });
+    }
+
+    // Appointments
+    async getAppointments(params?: Record<string, unknown>) {
+        const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+        return this.request<unknown[]>(`/api/appointments${query}`);
+    }
+
+    // Dashboard Stats - already defined above, removing duplicate
+
+    async getDashboardRevenue(params?: Record<string, string>) {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return this.request<unknown>(`/api/dashboard/revenue${query}`);
+    }
+
+    async getDashboardOccupancy() {
+        return this.request<unknown>('/api/dashboard/occupancy');
+    }
+
+    // Reports
+    async getFinancialReport(params?: Record<string, string>) {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return this.request<unknown>(`/api/reports/financial${query}`);
+    }
+
+    async getContractsReport(params?: Record<string, string>) {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return this.request<unknown>(`/api/reports/contracts${query}`);
+    }
+
+    async getTenantsReport(params?: Record<string, string>) {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return this.request<unknown>(`/api/reports/tenants${query}`);
+    }
+
+    async getMaintenanceReport(params?: Record<string, string>) {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return this.request<unknown>(`/api/reports/maintenance${query}`);
+    }
+
+    // Reservations / Bookings
+    async createReservation(data: unknown) {
+        return this.request<unknown>('/api/reservations', { method: 'POST', body: data });
+    }
+
+    async getReservations(params?: Record<string, string>) {
+        const query = params ? '?' + new URLSearchParams(params).toString() : '';
+        return this.request<unknown[]>(`/api/reservations${query}`);
+    }
 }
+
 
 export const api = new ApiClient(API_BASE_URL);
 export type { ApiResponse };

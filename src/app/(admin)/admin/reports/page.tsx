@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { BarChart3, Download, TrendingUp, DollarSign, Users, Home, Calendar } from 'lucide-react';
+import { BarChart3, Download, TrendingUp, DollarSign, Users, Home, Calendar, Loader2 } from 'lucide-react';
 import {
     BarChart,
     Bar,
@@ -19,59 +21,93 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    LineChart,
-    Line,
     PieChart,
     Pie,
     Cell,
 } from 'recharts';
 
-const revenueChartData = [
-    { month: 'T1', revenue: 120000000, collected: 110000000 },
-    { month: 'T2', revenue: 125000000, collected: 120000000 },
-    { month: 'T3', revenue: 130000000, collected: 125000000 },
-    { month: 'T4', revenue: 128000000, collected: 128000000 },
-    { month: 'T5', revenue: 135000000, collected: 130000000 },
-    { month: 'T6', revenue: 140000000, collected: 138000000 },
-    { month: 'T7', revenue: 138000000, collected: 135000000 },
-    { month: 'T8', revenue: 142000000, collected: 140000000 },
-    { month: 'T9', revenue: 145000000, collected: 142000000 },
-    { month: 'T10', revenue: 148000000, collected: 145000000 },
-    { month: 'T11', revenue: 150000000, collected: 148000000 },
-    { month: 'T12', revenue: 152500000, collected: 139900000 },
-];
-
-const occupancyChartData = [
-    { name: 'Đã thuê', value: 38, color: '#22c55e' },
-    { name: 'Còn trống', value: 7, color: '#94a3b8' },
-];
-
 export default function AdminReportsPage() {
     const [period, setPeriod] = useState('month');
     const [year, setYear] = useState('2024');
 
-    const revenueData = {
-        total: 152500000,
-        collected: 139900000,
-        pending: 12600000,
-        growth: 8.5,
-    };
+    // Fetch financial report
+    const { data: financialRes, isLoading: isLoadingFinancial } = useQuery({
+        queryKey: ['financial-report', year],
+        queryFn: () => api.getFinancialReport({ year }),
+        staleTime: 60000,
+    });
 
-    const occupancyData = {
-        totalRooms: 45,
-        occupied: 38,
-        rate: 84.4,
-    };
+    // Fetch dashboard occupancy
+    const { data: occupancyRes, isLoading: isLoadingOccupancy } = useQuery({
+        queryKey: ['occupancy-report'],
+        queryFn: () => api.getDashboardOccupancy(),
+        staleTime: 60000,
+    });
 
-    const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN').format(price) + 'đ';
-    const formatTooltip = (value: number) => new Intl.NumberFormat('vi-VN').format(value) + 'đ';
+    // Fetch dashboard stats for overview
+    const { data: statsRes } = useQuery({
+        queryKey: ['dashboard-stats'],
+        queryFn: () => api.getDashboardStats(),
+        staleTime: 60000,
+    });
+
+    // Parse data with fallbacks
+    const financialData = financialRes?.data as any || {};
+    const occupancyData = occupancyRes?.data as any || {};
+    const statsData = statsRes?.data as any || {};
+
+    // Revenue data
+    const totalRevenue = financialData.totalRevenue || statsData.monthlyRevenue || 0;
+    const collectedAmount = financialData.collectedAmount || statsData.paidAmount || 0;
+    const pendingAmount = financialData.pendingAmount || statsData.pendingAmount || 0;
+    const growth = financialData.growth || 0;
+
+    // Occupancy data
+    const totalRooms = occupancyData.totalRooms || statsData.totalRooms || 0;
+    const occupiedRooms = occupancyData.occupiedRooms || 0;
+    const vacantRooms = occupancyData.vacantRooms || totalRooms - occupiedRooms;
+    const occupancyRate = occupancyData.rate || statsData.occupancyRate || (totalRooms > 0 ? (occupiedRooms / totalRooms * 100) : 0);
+
+    // Monthly revenue chart data (fallback to sample if no API data)
+    const revenueChartData = financialData.monthlyData || [
+        { month: 'T1', revenue: 0, collected: 0 },
+        { month: 'T2', revenue: 0, collected: 0 },
+        { month: 'T3', revenue: 0, collected: 0 },
+        { month: 'T4', revenue: 0, collected: 0 },
+        { month: 'T5', revenue: 0, collected: 0 },
+        { month: 'T6', revenue: 0, collected: 0 },
+        { month: 'T7', revenue: 0, collected: 0 },
+        { month: 'T8', revenue: 0, collected: 0 },
+        { month: 'T9', revenue: 0, collected: 0 },
+        { month: 'T10', revenue: 0, collected: 0 },
+        { month: 'T11', revenue: 0, collected: 0 },
+        { month: 'T12', revenue: totalRevenue, collected: collectedAmount },
+    ];
+
+    const occupancyChartData = [
+        { name: 'Đã thuê', value: occupiedRooms || 0, color: '#22c55e' },
+        { name: 'Còn trống', value: vacantRooms || 0, color: '#94a3b8' },
+    ];
+
+    const formatPrice = (price: number) => new Intl.NumberFormat('vi-VN').format(price || 0) + 'đ';
+    const formatTooltip = (value: number) => new Intl.NumberFormat('vi-VN').format(value || 0) + 'đ';
+
+    const isLoading = isLoadingFinancial || isLoadingOccupancy;
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Báo cáo & Thống kê</h1>
-                    <p className="text-muted-foreground">Xem báo cáo doanh thu và hoạt động</p>
+                    <p className="text-muted-foreground">Xem báo cáo doanh thu và hoạt động (API Real Data)</p>
                 </div>
                 <div className="flex gap-2">
                     <Select value={period} onValueChange={setPeriod}>
@@ -89,8 +125,9 @@ export default function AdminReportsPage() {
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                            <SelectItem value="2026">2026</SelectItem>
+                            <SelectItem value="2025">2025</SelectItem>
                             <SelectItem value="2024">2024</SelectItem>
-                            <SelectItem value="2023">2023</SelectItem>
                         </SelectContent>
                     </Select>
                     <Button variant="outline">
@@ -107,7 +144,7 @@ export default function AdminReportsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground">Tổng doanh thu</p>
-                                <p className="text-2xl font-bold text-primary">{formatPrice(revenueData.total)}</p>
+                                <p className="text-2xl font-bold text-primary">{formatPrice(totalRevenue)}</p>
                             </div>
                             <DollarSign className="h-10 w-10 text-green-500" />
                         </div>
@@ -118,7 +155,7 @@ export default function AdminReportsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground">Đã thu</p>
-                                <p className="text-2xl font-bold text-green-600">{formatPrice(revenueData.collected)}</p>
+                                <p className="text-2xl font-bold text-green-600">{formatPrice(collectedAmount)}</p>
                             </div>
                             <TrendingUp className="h-10 w-10 text-green-500" />
                         </div>
@@ -129,7 +166,7 @@ export default function AdminReportsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground">Chưa thu</p>
-                                <p className="text-2xl font-bold text-orange-600">{formatPrice(revenueData.pending)}</p>
+                                <p className="text-2xl font-bold text-orange-600">{formatPrice(pendingAmount)}</p>
                             </div>
                             <Calendar className="h-10 w-10 text-orange-500" />
                         </div>
@@ -140,7 +177,7 @@ export default function AdminReportsPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-muted-foreground">Tăng trưởng</p>
-                                <p className="text-2xl font-bold text-blue-600">+{revenueData.growth}%</p>
+                                <p className="text-2xl font-bold text-blue-600">+{growth.toFixed(1)}%</p>
                             </div>
                             <BarChart3 className="h-10 w-10 text-blue-500" />
                         </div>
@@ -210,16 +247,16 @@ export default function AdminReportsPage() {
                             </ResponsiveContainer>
                         </div>
                         <div className="text-center">
-                            <p className="text-4xl font-bold text-green-600">{occupancyData.rate}%</p>
+                            <p className="text-4xl font-bold text-green-600">{occupancyRate.toFixed(1)}%</p>
                             <p className="text-muted-foreground">Tỷ lệ lấp đầy</p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="text-center p-4 bg-muted/50 rounded-lg">
-                                <p className="text-2xl font-bold">{occupancyData.totalRooms}</p>
+                                <p className="text-2xl font-bold">{totalRooms}</p>
                                 <p className="text-sm text-muted-foreground">Tổng phòng</p>
                             </div>
                             <div className="text-center p-4 bg-muted/50 rounded-lg">
-                                <p className="text-2xl font-bold text-green-600">{occupancyData.occupied}</p>
+                                <p className="text-2xl font-bold text-green-600">{occupiedRooms}</p>
                                 <p className="text-sm text-muted-foreground">Đang cho thuê</p>
                             </div>
                         </div>

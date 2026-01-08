@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth-context';
 import {
@@ -13,43 +15,107 @@ import {
     CheckCircle,
     DollarSign,
     Calendar,
+    Loader2,
 } from 'lucide-react';
 
 export default function AdminDashboard() {
     const { user } = useAuth();
 
+    // Fetch dashboard stats từ API
+    const { data: statsResponse, isLoading: isLoadingStats } = useQuery({
+        queryKey: ['dashboard-stats'],
+        queryFn: () => api.getDashboardStats(),
+        staleTime: 60000,
+    });
+
+    // Fetch contracts để lấy hợp đồng sắp hết hạn
+    const { data: contractsResponse } = useQuery({
+        queryKey: ['expiring-contracts'],
+        queryFn: () => api.getContracts({ status: 'ACTIVE' }),
+        staleTime: 60000,
+    });
+
+    // Fetch recent maintenance requests
+    const { data: maintenanceResponse } = useQuery({
+        queryKey: ['recent-maintenance'],
+        queryFn: () => api.getMaintenanceRequests({ limit: '5' }),
+        staleTime: 60000,
+    });
+
+    // Parse data
+    const dashboardStats = statsResponse?.data as any || {};
+    const contracts = Array.isArray(contractsResponse?.data) ? contractsResponse.data : [];
+    const maintenanceRequests = Array.isArray(maintenanceResponse?.data) ? maintenanceResponse.data : [];
+
+    // Calculate stats
+    const totalMotels = dashboardStats.totalMotels || 0;
+    const totalRooms = dashboardStats.totalRooms || 0;
+    const totalTenants = dashboardStats.totalTenants || 0;
+    const occupancyRate = dashboardStats.occupancyRate || 0;
+    const monthlyRevenue = dashboardStats.monthlyRevenue || 0;
+    const pendingAmount = dashboardStats.pendingAmount || 0;
+    const paidAmount = dashboardStats.paidAmount || 0;
+
     const stats = [
-        { label: 'Tổng nhà trọ', value: '5', icon: Building, color: 'text-blue-500', change: '+1', trend: 'up' },
-        { label: 'Tổng phòng', value: '45', icon: Home, color: 'text-green-500', change: '+3', trend: 'up' },
-        { label: 'Người thuê', value: '38', icon: Users, color: 'text-purple-500', change: '+5', trend: 'up' },
-        { label: 'Tỷ lệ lấp đầy', value: '84%', icon: TrendingUp, color: 'text-orange-500', change: '+2%', trend: 'up' },
+        { label: 'Tổng nhà trọ', value: totalMotels.toString(), icon: Building, color: 'text-blue-500', change: '+0', trend: 'up' },
+        { label: 'Tổng phòng', value: totalRooms.toString(), icon: Home, color: 'text-green-500', change: '+0', trend: 'up' },
+        { label: 'Người thuê', value: totalTenants.toString(), icon: Users, color: 'text-purple-500', change: '+0', trend: 'up' },
+        { label: 'Tỷ lệ lấp đầy', value: `${Math.round(occupancyRate)}%`, icon: TrendingUp, color: 'text-orange-500', change: '+0%', trend: 'up' },
     ];
+
+    const formatPrice = (price: number) => {
+        return new Intl.NumberFormat('vi-VN').format(price || 0) + 'đ';
+    };
 
     const financialStats = [
-        { label: 'Doanh thu tháng này', value: '152,500,000đ', icon: DollarSign, color: 'text-green-600' },
-        { label: 'Chưa thu', value: '12,600,000đ', icon: AlertCircle, color: 'text-orange-600' },
-        { label: 'Đã thu', value: '139,900,000đ', icon: CheckCircle, color: 'text-blue-600' },
+        { label: 'Doanh thu tháng này', value: formatPrice(monthlyRevenue), icon: DollarSign, color: 'text-green-600' },
+        { label: 'Chưa thu', value: formatPrice(pendingAmount), icon: AlertCircle, color: 'text-orange-600' },
+        { label: 'Đã thu', value: formatPrice(paidAmount), icon: CheckCircle, color: 'text-blue-600' },
     ];
 
-    const recentActivities = [
-        { type: 'contract', title: 'Hợp đồng mới - Phòng B203', time: '2 giờ trước', status: 'success' },
-        { type: 'payment', title: 'Thanh toán - Nguyễn Văn A', time: '3 giờ trước', status: 'success' },
-        { type: 'maintenance', title: 'Yêu cầu sửa chữa - Phòng A101', time: '5 giờ trước', status: 'pending' },
-        { type: 'invoice', title: 'Tạo hóa đơn tháng 12', time: 'Hôm qua', status: 'success' },
-    ];
+    // Get expiring contracts (within 30 days)
+    const expiringContracts = contracts
+        .filter((c: any) => {
+            if (!c.endDate) return false;
+            const endDate = new Date(c.endDate);
+            const now = new Date();
+            const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            return daysLeft > 0 && daysLeft <= 30;
+        })
+        .slice(0, 3)
+        .map((c: any) => {
+            const endDate = new Date(c.endDate);
+            const now = new Date();
+            const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            return {
+                room: c.room?.name || 'N/A',
+                tenant: c.tenant?.fullName || 'N/A',
+                expiresIn: `${daysLeft} ngày`
+            };
+        });
 
-    const upcomingExpirations = [
-        { room: 'Phòng A102', tenant: 'Trần Thị B', expiresIn: '15 ngày' },
-        { room: 'Phòng C301', tenant: 'Lê Văn C', expiresIn: '23 ngày' },
-        { room: 'Phòng B205', tenant: 'Phạm Thị D', expiresIn: '30 ngày' },
-    ];
+    // Map recent activities from maintenance
+    const recentActivities = maintenanceRequests.slice(0, 4).map((m: any) => ({
+        type: 'maintenance',
+        title: m.title || 'Yêu cầu sửa chữa',
+        time: m.createdAt ? new Date(m.createdAt).toLocaleDateString('vi-VN') : 'N/A',
+        status: m.status === 'COMPLETED' ? 'success' : 'pending'
+    }));
+
+    if (isLoadingStats) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
             {/* Welcome */}
             <div>
                 <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Xin chào, {user?.fullName || 'Admin'}! Đây là tổng quan hệ thống.</p>
+                <p className="text-muted-foreground">Xin chào, {user?.fullName || 'Admin'}! Đây là tổng quan hệ thống (API Real Data).</p>
             </div>
 
             {/* Main Stats */}
@@ -103,7 +169,7 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {recentActivities.map((activity, index) => (
+                            {recentActivities.length > 0 ? recentActivities.map((activity: any, index: number) => (
                                 <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
                                     <div className="flex items-center gap-3">
                                         <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${activity.status === 'success' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
@@ -123,7 +189,9 @@ export default function AdminDashboard() {
                                         {activity.status === 'success' ? 'Hoàn thành' : 'Đang xử lý'}
                                     </span>
                                 </div>
-                            ))}
+                            )) : (
+                                <p className="text-muted-foreground text-center py-4">Chưa có hoạt động nào</p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -138,7 +206,7 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {upcomingExpirations.map((item, index) => (
+                            {expiringContracts.length > 0 ? expiringContracts.map((item: any, index: number) => (
                                 <div key={index} className="flex items-center justify-between py-3 border-b last:border-0">
                                     <div>
                                         <p className="font-medium">{item.room}</p>
@@ -148,7 +216,9 @@ export default function AdminDashboard() {
                                         Còn {item.expiresIn}
                                     </span>
                                 </div>
-                            ))}
+                            )) : (
+                                <p className="text-muted-foreground text-center py-4">Không có hợp đồng nào sắp hết hạn</p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

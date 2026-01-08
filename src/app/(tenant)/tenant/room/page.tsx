@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,54 +22,71 @@ import {
     MessageCircle,
     FileText,
     Wrench,
+    Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
 
 export default function TenantRoomPage() {
-    // Mock data - phòng đang thuê
-    const room = {
-        id: '1',
-        name: 'Phòng 101 - Studio cao cấp',
-        propertyName: 'Nhà Trọ Minh Tâm',
-        address: '123 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh',
-        price: 4500000,
-        area: 25,
-        floor: 1,
-        maxOccupants: 2,
-        amenities: ['Wifi miễn phí', 'Điều hòa', 'Tủ lạnh', 'WC riêng', 'Ban công', 'Giường', 'Tủ quần áo'],
-        utilities: {
-            electricity: 3500,
-            water: 100000,
-            internet: 0,
-            parking: 200000,
-        },
-        images: [
-            'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
-            'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
-            'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800',
-        ],
-        ownerName: 'Nguyễn Minh Tâm',
-        ownerPhone: '0901234567',
-        ownerAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
-    };
+    // Lấy hợp đồng đang active của tenant
+    const { data: contractsRes, isLoading } = useQuery({
+        queryKey: ['my-contracts'],
+        queryFn: () => api.getContracts({ mine: 'true', status: 'ACTIVE' })
+    });
+
+    const contracts = Array.isArray(contractsRes?.data) ? contractsRes.data : [];
+    const activeContract = contracts.find((c: any) => c.status === 'ACTIVE');
+    const room = (activeContract as any)?.room;
+    const motel = room?.motel;
+    const landlord = motel?.landlord;
 
     const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('vi-VN').format(price);
+        return new Intl.NumberFormat('vi-VN').format(price || 0);
     };
 
+    if (isLoading) {
+        return (
+            <div className="flex justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!room) {
+        return (
+            <div className="space-y-6">
+                <div>
+                    <h1 className="text-2xl font-bold">Phòng của tôi</h1>
+                    <p className="text-muted-foreground">Thông tin chi tiết về phòng bạn đang thuê</p>
+                </div>
+                <Card>
+                    <CardContent className="p-8 text-center">
+                        <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">Bạn chưa có hợp đồng thuê phòng nào</p>
+                        <Button asChild className="mt-4">
+                            <Link href="/rooms">Tìm phòng</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     const utilities = [
-        { icon: Zap, label: 'Điện', value: `${formatPrice(room.utilities.electricity)}đ/kWh` },
-        { icon: Droplets, label: 'Nước', value: `${formatPrice(room.utilities.water)}đ/tháng` },
-        { icon: Wifi, label: 'Internet', value: room.utilities.internet === 0 ? 'Miễn phí' : `${formatPrice(room.utilities.internet)}đ/tháng` },
-        { icon: Car, label: 'Gửi xe', value: room.utilities.parking === 0 ? 'Miễn phí' : `${formatPrice(room.utilities.parking)}đ/tháng` },
+        { icon: Zap, label: 'Điện', value: room.electricityPrice ? `${formatPrice(room.electricityPrice)}đ/kWh` : '---' },
+        { icon: Droplets, label: 'Nước', value: room.waterPrice ? `${formatPrice(room.waterPrice)}đ/tháng` : '---' },
+        { icon: Wifi, label: 'Internet', value: '---' },
+        { icon: Car, label: 'Gửi xe', value: '---' },
     ];
+
+    // Build amenities from room.utilities
+    const amenities = room.utilities?.map((u: any) => u.name) || [];
 
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Phòng của tôi</h1>
-                <p className="text-muted-foreground">Thông tin chi tiết về phòng bạn đang thuê</p>
+                <p className="text-muted-foreground">Thông tin chi tiết về phòng bạn đang thuê (API Real Data)</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -79,15 +98,15 @@ export default function TenantRoomPage() {
                             <div className="grid grid-cols-3 gap-2">
                                 <div className="col-span-2 row-span-2">
                                     <img
-                                        src={room.images[0]}
+                                        src={room.images?.[0]?.url || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800'}
                                         alt={room.name}
                                         className="w-full h-full object-cover rounded-lg aspect-video"
                                     />
                                 </div>
-                                {room.images.slice(1, 3).map((image, index) => (
+                                {(room.images?.slice(1, 3) || []).map((image: any, index: number) => (
                                     <img
                                         key={index}
-                                        src={image}
+                                        src={image.url || image}
                                         alt={`${room.name} ${index + 2}`}
                                         className="w-full h-full object-cover rounded-lg aspect-square"
                                     />
@@ -103,7 +122,7 @@ export default function TenantRoomPage() {
                                 <div>
                                     <Badge className="mb-2 bg-green-500">Đang thuê</Badge>
                                     <CardTitle className="text-xl">{room.name}</CardTitle>
-                                    <p className="text-muted-foreground">{room.propertyName}</p>
+                                    <p className="text-muted-foreground">{motel?.name || 'Nhà trọ'}</p>
                                 </div>
                                 <div className="text-right">
                                     <span className="text-2xl font-bold text-primary">{formatPrice(room.price)}đ</span>
@@ -114,7 +133,7 @@ export default function TenantRoomPage() {
                         <CardContent className="space-y-6">
                             <div className="flex items-center gap-1 text-muted-foreground">
                                 <MapPin className="h-4 w-4" />
-                                <span>{room.address}</span>
+                                <span>{motel?.address || '---'}</span>
                             </div>
 
                             {/* Quick Info */}
@@ -130,14 +149,14 @@ export default function TenantRoomPage() {
                                     <Users className="h-5 w-5 text-primary" />
                                     <div>
                                         <div className="text-sm text-muted-foreground">Số người</div>
-                                        <div className="font-semibold">Tối đa {room.maxOccupants}</div>
+                                        <div className="font-semibold">Tối đa {room.maxOccupants || 2}</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                                     <Building className="h-5 w-5 text-primary" />
                                     <div>
                                         <div className="text-sm text-muted-foreground">Tầng</div>
-                                        <div className="font-semibold">Tầng {room.floor}</div>
+                                        <div className="font-semibold">Tầng {room.floor || 1}</div>
                                     </div>
                                 </div>
                             </div>
@@ -145,17 +164,19 @@ export default function TenantRoomPage() {
                             <Separator />
 
                             {/* Amenities */}
-                            <div>
-                                <h3 className="font-semibold mb-3">Tiện nghi</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {room.amenities.map((amenity, index) => (
-                                        <div key={index} className="flex items-center gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500" />
-                                            <span className="text-sm">{amenity}</span>
-                                        </div>
-                                    ))}
+                            {amenities.length > 0 && (
+                                <div>
+                                    <h3 className="font-semibold mb-3">Tiện nghi</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        {amenities.map((amenity: string, index: number) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                <span className="text-sm">{amenity}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <Separator />
 
@@ -186,11 +207,11 @@ export default function TenantRoomPage() {
                         <CardContent className="space-y-4">
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-14 w-14">
-                                    <AvatarImage src={room.ownerAvatar} />
-                                    <AvatarFallback>{room.ownerName[0]}</AvatarFallback>
+                                    <AvatarImage src={landlord?.avatarUrl} />
+                                    <AvatarFallback>{landlord?.fullName?.[0] || 'C'}</AvatarFallback>
                                 </Avatar>
                                 <div>
-                                    <div className="font-semibold">{room.ownerName}</div>
+                                    <div className="font-semibold">{landlord?.fullName || 'Chủ nhà'}</div>
                                     <div className="text-sm text-muted-foreground">Chủ nhà</div>
                                 </div>
                             </div>

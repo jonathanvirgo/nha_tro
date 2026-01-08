@@ -60,6 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const response = await api.login(email, password);
         if (response.success && response.data) {
             api.setToken(response.data.accessToken);
+            // Set cookie for middleware
+            document.cookie = `auth-token=${response.data.accessToken}; path=/; max-age=86400; SameSite=Lax`;
             await refreshUser();
             return { success: true };
         }
@@ -82,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = async () => {
         await api.logout();
+        document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         setUser(null);
     };
 

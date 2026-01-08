@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,10 +24,60 @@ import {
     Users,
     Building,
     CheckCircle,
+    Loader2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { mockRooms, mockTestimonials, statistics, districts } from '@/data/mockData';
 import { RoomCard } from '@/components/room/RoomCard';
+
+// Static data
+const districts = [
+    'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5',
+    'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10',
+    'Quận 11', 'Quận 12', 'Quận Bình Thạnh', 'Quận Gò Vấp',
+    'Quận Phú Nhuận', 'Quận Tân Bình', 'Quận Thủ Đức',
+];
+
+const statistics = {
+    totalRooms: 5000,
+    totalUsers: 10000,
+    totalBookings: 15000,
+    cities: 20,
+};
+
+const mockTestimonials = [
+    {
+        id: '1',
+        name: 'Nguyễn Văn An',
+        role: 'Sinh viên',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        content: 'Tìm được phòng trọ gần trường rất nhanh chóng. Giao diện dễ sử dụng, thông tin phòng đầy đủ và chính xác.',
+        rating: 5,
+    },
+    {
+        id: '2',
+        name: 'Trần Thị Bình',
+        role: 'Nhân viên văn phòng',
+        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+        content: 'Đặt lịch xem phòng online rất tiện lợi, không cần gọi điện nhiều lần. Chủ nhà phản hồi nhanh.',
+        rating: 5,
+    },
+    {
+        id: '3',
+        name: 'Lê Văn Cường',
+        role: 'Kỹ sư phần mềm',
+        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+        content: 'So sánh nhiều phòng cùng lúc giúp tôi đưa ra quyết định tốt hơn. Rất hài lòng với trải nghiệm.',
+        rating: 4,
+    },
+    {
+        id: '4',
+        name: 'Phạm Thị Dung',
+        role: 'Chủ nhà trọ',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        content: 'Đăng tin cho thuê phòng rất dễ dàng. Có nhiều người liên hệ xem phòng hơn so với các kênh khác.',
+        rating: 5,
+    },
+];
 
 const features = [
     {
@@ -55,7 +107,14 @@ export default function LandingPage() {
     const [selectedDistrict, setSelectedDistrict] = useState('');
     const [priceRange, setPriceRange] = useState('');
 
-    const featuredRooms = mockRooms.slice(0, 4);
+    // Fetch API real data cho featured rooms
+    const { data: response, isLoading } = useQuery({
+        queryKey: ['featured-rooms'],
+        queryFn: () => api.searchRooms({ limit: '4', status: 'AVAILABLE' }),
+        staleTime: 60000, // Cache for 1 minute
+    });
+
+    const featuredRooms = Array.isArray(response?.data) ? response.data.slice(0, 4) : [];
 
     return (
         <div className="flex flex-col">
@@ -195,7 +254,7 @@ export default function LandingPage() {
                                 Phòng trọ <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">nổi bật</span>
                             </h2>
                             <p className="text-muted-foreground">
-                                Những phòng trọ được đánh giá cao nhất
+                                Những phòng trọ được đánh giá cao nhất (API Real Data)
                             </p>
                         </div>
                         <Button asChild variant="outline" className="hidden md:flex">
@@ -206,11 +265,21 @@ export default function LandingPage() {
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {featuredRooms.map((room, index) => (
-                            <RoomCard key={room.id} room={room} index={index} />
-                        ))}
-                    </div>
+                    {isLoading ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    ) : featuredRooms.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {featuredRooms.map((room: any, index: number) => (
+                                <RoomCard key={room.id} room={room} index={index} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-muted-foreground">
+                            Chưa có phòng trọ nào
+                        </div>
+                    )}
 
                     <div className="mt-8 text-center md:hidden">
                         <Button asChild variant="outline">
@@ -294,8 +363,8 @@ export default function LandingPage() {
                                             <Star
                                                 key={i}
                                                 className={`h-4 w-4 ${i < testimonial.rating
-                                                        ? 'fill-yellow-400 text-yellow-400'
-                                                        : 'text-muted'
+                                                    ? 'fill-yellow-400 text-yellow-400'
+                                                    : 'text-muted'
                                                     }`}
                                             />
                                         ))}

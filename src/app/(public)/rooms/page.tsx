@@ -2,6 +2,8 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams as useNextSearchParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,10 +30,24 @@ import {
     List,
     MapPin,
     X,
+    Loader2,
 } from 'lucide-react';
-import { mockRooms, districts, amenitiesList } from '@/data/mockData';
 import { RoomCard } from '@/components/room/RoomCard';
 import { Badge } from '@/components/ui/badge';
+
+// Static data for districts and amenities (không thay đổi thường xuyên)
+const districts = [
+    'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5',
+    'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10',
+    'Quận 11', 'Quận 12', 'Quận Bình Thạnh', 'Quận Gò Vấp',
+    'Quận Phú Nhuận', 'Quận Tân Bình', 'Quận Thủ Đức',
+];
+
+const amenitiesList = [
+    'Wifi miễn phí', 'Điều hòa', 'Tủ lạnh', 'Máy giặt',
+    'WC riêng', 'Ban công', 'Bếp riêng', 'Giường',
+    'Tủ quần áo', 'Bàn làm việc', 'Thang máy', 'Bãi đỗ xe',
+];
 
 type ViewMode = 'grid' | 'list';
 type SortOption = 'newest' | 'price-asc' | 'price-desc' | 'rating' | 'area';
@@ -47,6 +63,24 @@ function RoomsPageContent() {
     const [sortBy, setSortBy] = useState<SortOption>('newest');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
+    // Fetch rooms từ API
+    const { data: response, isLoading } = useQuery({
+        queryKey: ['search-rooms', searchQuery, selectedDistrict, priceRange, areaRange],
+        queryFn: () => {
+            const params: Record<string, string> = {};
+            if (searchQuery) params.keyword = searchQuery;
+            if (selectedDistrict) params.district = selectedDistrict;
+            if (priceRange[0] > 0) params.minPrice = String(priceRange[0]);
+            if (priceRange[1] < 10000000) params.maxPrice = String(priceRange[1]);
+            if (areaRange[0] > 0) params.minArea = String(areaRange[0]);
+            if (areaRange[1] < 50) params.maxArea = String(areaRange[1]);
+            return api.searchRooms(params);
+        },
+        staleTime: 30000, // Cache for 30 seconds
+    });
+
+    const rooms = response?.data || [];
+
     const formatPrice = (price: number) => {
         if (price >= 1000000) {
             return `${(price / 1000000).toFixed(1)}tr`;
@@ -55,56 +89,36 @@ function RoomsPageContent() {
     };
 
     const filteredRooms = useMemo(() => {
-        let rooms = [...mockRooms];
+        let result = Array.isArray(rooms) ? [...rooms] : [];
 
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            rooms = rooms.filter(
-                (room) =>
-                    room.name.toLowerCase().includes(query) ||
-                    room.address.toLowerCase().includes(query) ||
-                    room.propertyName.toLowerCase().includes(query)
-            );
-        }
-
-        if (selectedDistrict) {
-            rooms = rooms.filter((room) => room.district === selectedDistrict);
-        }
-
-        rooms = rooms.filter(
-            (room) => room.price >= priceRange[0] && room.price <= priceRange[1]
-        );
-
-        rooms = rooms.filter(
-            (room) => room.area >= areaRange[0] && room.area <= areaRange[1]
-        );
-
+        // Filter by amenities (client-side since API might not support)
         if (selectedAmenities.length > 0) {
-            rooms = rooms.filter((room) =>
-                selectedAmenities.every((amenity) => room.amenities.includes(amenity))
+            result = result.filter((room: any) =>
+                selectedAmenities.every((amenity) => room.amenities?.includes(amenity) || room.utilities?.some((u: any) => u.name === amenity))
             );
         }
 
+        // Sort
         switch (sortBy) {
             case 'price-asc':
-                rooms.sort((a, b) => a.price - b.price);
+                result.sort((a: any, b: any) => a.price - b.price);
                 break;
             case 'price-desc':
-                rooms.sort((a, b) => b.price - a.price);
+                result.sort((a: any, b: any) => b.price - a.price);
                 break;
             case 'rating':
-                rooms.sort((a, b) => b.rating - a.rating);
+                result.sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0));
                 break;
             case 'area':
-                rooms.sort((a, b) => b.area - a.area);
+                result.sort((a: any, b: any) => b.area - a.area);
                 break;
             case 'newest':
             default:
-                rooms.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                result.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         }
 
-        return rooms;
-    }, [searchQuery, selectedDistrict, priceRange, areaRange, selectedAmenities, sortBy]);
+        return result;
+    }, [rooms, selectedAmenities, sortBy]);
 
     const activeFiltersCount = useMemo(() => {
         let count = 0;
@@ -266,7 +280,9 @@ function RoomsPageContent() {
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <MapPin className="h-4 w-4" />
                                 <span>
-                                    Tìm thấy <strong className="text-foreground">{filteredRooms.length}</strong> phòng
+                                    {isLoading ? 'Đang tải...' : (
+                                        <>Tìm thấy <strong className="text-foreground">{filteredRooms.length}</strong> phòng</>
+                                    )}
                                 </span>
                             </div>
 
@@ -350,7 +366,11 @@ function RoomsPageContent() {
                     </aside>
 
                     <div className="flex-1">
-                        {filteredRooms.length === 0 ? (
+                        {isLoading ? (
+                            <div className="flex justify-center py-20">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            </div>
+                        ) : filteredRooms.length === 0 ? (
                             <div className="text-center py-20">
                                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
                                     <Search className="h-8 w-8 text-muted-foreground" />
@@ -365,13 +385,13 @@ function RoomsPageContent() {
                             </div>
                         ) : viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {filteredRooms.map((room, index) => (
+                                {filteredRooms.map((room: any, index: number) => (
                                     <RoomCard key={room.id} room={room} index={index} />
                                 ))}
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {filteredRooms.map((room, index) => (
+                                {filteredRooms.map((room: any, index: number) => (
                                     <RoomCard key={room.id} room={room} index={index} variant="horizontal" />
                                 ))}
                             </div>

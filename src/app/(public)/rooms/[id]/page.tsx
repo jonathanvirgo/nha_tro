@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,8 +37,8 @@ import {
     CheckCircle,
     Clock,
     Shield,
+    Loader2,
 } from 'lucide-react';
-import { mockRooms, mockReviews } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 
 export default function RoomDetailPage() {
@@ -46,10 +48,28 @@ export default function RoomDetailPage() {
     const [isGalleryOpen, setIsGalleryOpen] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
 
-    const room = mockRooms.find((r) => r.id === id);
-    const reviews = mockReviews.filter((r) => r.roomId === id);
+    // Fetch room từ API
+    const { data: response, isLoading, error } = useQuery({
+        queryKey: ['room', id],
+        queryFn: () => api.getRoom(id),
+        enabled: !!id,
+    });
 
-    if (!room) {
+    const room = response?.data as any;
+
+    const formatPrice = (price: number) => {
+        return new Intl.NumberFormat('vi-VN').format(price || 0);
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!room || error) {
         return (
             <div className="container py-20 text-center">
                 <h1 className="text-2xl font-bold mb-4">Không tìm thấy phòng</h1>
@@ -60,24 +80,33 @@ export default function RoomDetailPage() {
         );
     }
 
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('vi-VN').format(price);
-    };
+    // Handle images - use room images or default placeholder
+    const images = room.images?.length > 0
+        ? room.images.map((img: any) => img.url || img)
+        : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800'];
 
     const nextImage = () => {
-        setCurrentImageIndex((prev) => (prev + 1) % room.images.length);
+        setCurrentImageIndex((prev) => (prev + 1) % images.length);
     };
 
     const prevImage = () => {
-        setCurrentImageIndex((prev) => (prev - 1 + room.images.length) % room.images.length);
+        setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
     };
 
+    // Build utilities from room data
     const utilities = [
-        { icon: Zap, label: 'Điện', value: `${formatPrice(room.utilities.electricity)}đ/kWh` },
-        { icon: Droplets, label: 'Nước', value: `${formatPrice(room.utilities.water)}đ/tháng` },
-        { icon: Wifi, label: 'Internet', value: room.utilities.internet === 0 ? 'Miễn phí' : `${formatPrice(room.utilities.internet)}đ/tháng` },
-        { icon: Car, label: 'Gửi xe', value: room.utilities.parking === 0 ? 'Miễn phí' : `${formatPrice(room.utilities.parking)}đ/tháng` },
+        { icon: Zap, label: 'Điện', value: room.electricityPrice ? `${formatPrice(room.electricityPrice)}đ/kWh` : '---' },
+        { icon: Droplets, label: 'Nước', value: room.waterPrice ? `${formatPrice(room.waterPrice)}đ/người` : '---' },
+        { icon: Wifi, label: 'Internet', value: room.internetPrice === 0 ? 'Miễn phí' : (room.internetPrice ? `${formatPrice(room.internetPrice)}đ/tháng` : '---') },
+        { icon: Car, label: 'Gửi xe', value: '---' },
     ];
+
+    // Build amenities from room.utilities or room.amenities
+    const amenities = room.amenities || room.utilities?.map((u: any) => u.name) || [];
+
+    // Get motel info
+    const motel = room.motel || {};
+    const landlord = motel.landlord || {};
 
     return (
         <div className="min-h-screen bg-background">
@@ -89,17 +118,17 @@ export default function RoomDetailPage() {
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-2 cursor-pointer group">
                                 <div className="md:col-span-2 md:row-span-2 relative aspect-[4/3] md:aspect-auto md:h-[400px] rounded-lg overflow-hidden">
                                     <img
-                                        src={room.images[0]}
+                                        src={images[0]}
                                         alt={room.name}
                                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                     />
                                 </div>
-                                {room.images.slice(1, 5).map((image, index) => (
+                                {images.slice(1, 5).map((image: string, index: number) => (
                                     <div
                                         key={index}
                                         className={cn(
                                             "relative aspect-[4/3] rounded-lg overflow-hidden hidden md:block",
-                                            index === 3 && room.images.length > 5 && "relative"
+                                            index === 3 && images.length > 5 && "relative"
                                         )}
                                     >
                                         <img
@@ -107,10 +136,10 @@ export default function RoomDetailPage() {
                                             alt={`${room.name} ${index + 2}`}
                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                         />
-                                        {index === 3 && room.images.length > 5 && (
+                                        {index === 3 && images.length > 5 && (
                                             <div className="absolute inset-0 bg-foreground/60 flex items-center justify-center">
                                                 <span className="text-background font-semibold text-lg">
-                                                    +{room.images.length - 5} ảnh
+                                                    +{images.length - 5} ảnh
                                                 </span>
                                             </div>
                                         )}
@@ -125,7 +154,7 @@ export default function RoomDetailPage() {
                             </DialogHeader>
                             <div className="relative">
                                 <img
-                                    src={room.images[currentImageIndex]}
+                                    src={images[currentImageIndex]}
                                     alt={`${room.name} ${currentImageIndex + 1}`}
                                     className="w-full aspect-video object-cover"
                                 />
@@ -158,7 +187,9 @@ export default function RoomDetailPage() {
                         <div>
                             <div className="flex items-start justify-between gap-4 mb-2">
                                 <div>
-                                    <Badge className="mb-2 bg-green-500 text-white">Còn trống</Badge>
+                                    <Badge className={cn("mb-2", room.status === 'AVAILABLE' ? 'bg-green-500' : 'bg-gray-500')}>
+                                        {room.status === 'AVAILABLE' ? 'Còn trống' : (room.status === 'RENTED' ? 'Đã thuê' : room.status)}
+                                    </Badge>
                                     <h1 className="text-2xl md:text-3xl font-bold">{room.name}</h1>
                                 </div>
                                 <div className="flex gap-2">
@@ -178,13 +209,15 @@ export default function RoomDetailPage() {
                             <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                     <MapPin className="h-4 w-4" />
-                                    <span>{room.address}, {room.district}, {room.city}</span>
+                                    <span>{motel.address || room.address || '---'}</span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span className="font-medium text-foreground">{room.rating}</span>
-                                    <span>({room.reviewCount} đánh giá)</span>
-                                </div>
+                                {room.rating && (
+                                    <div className="flex items-center gap-1">
+                                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                        <span className="font-medium text-foreground">{room.rating}</span>
+                                        <span>({room.reviewCount || 0} đánh giá)</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -203,47 +236,53 @@ export default function RoomDetailPage() {
                                 <Users className="h-5 w-5 text-primary" />
                                 <div>
                                     <div className="text-sm text-muted-foreground">Số người</div>
-                                    <div className="font-semibold">Tối đa {room.maxOccupants}</div>
+                                    <div className="font-semibold">Tối đa {room.maxOccupants || 2}</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
                                 <Building className="h-5 w-5 text-primary" />
                                 <div>
                                     <div className="text-sm text-muted-foreground">Tầng</div>
-                                    <div className="font-semibold">Tầng {room.floor}</div>
+                                    <div className="font-semibold">Tầng {room.floor || 1}</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
                                 <Clock className="h-5 w-5 text-primary" />
                                 <div>
                                     <div className="text-sm text-muted-foreground">Đặt cọc</div>
-                                    <div className="font-semibold">{formatPrice(room.deposit)}đ</div>
+                                    <div className="font-semibold">{formatPrice(room.deposit || room.price)}đ</div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Description */}
-                        <div>
-                            <h2 className="text-xl font-semibold mb-3">Mô tả</h2>
-                            <p className="text-muted-foreground leading-relaxed">{room.description}</p>
-                        </div>
-
-                        <Separator />
+                        {room.description && (
+                            <>
+                                <div>
+                                    <h2 className="text-xl font-semibold mb-3">Mô tả</h2>
+                                    <p className="text-muted-foreground leading-relaxed">{room.description}</p>
+                                </div>
+                                <Separator />
+                            </>
+                        )}
 
                         {/* Amenities */}
-                        <div>
-                            <h2 className="text-xl font-semibold mb-4">Tiện nghi</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                {room.amenities.map((amenity, index) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <CheckCircle className="h-4 w-4 text-green-500" />
-                                        <span>{amenity}</span>
+                        {amenities.length > 0 && (
+                            <>
+                                <div>
+                                    <h2 className="text-xl font-semibold mb-4">Tiện nghi</h2>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {amenities.map((amenity: string, index: number) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                <span>{amenity}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <Separator />
+                                </div>
+                                <Separator />
+                            </>
+                        )}
 
                         {/* Utilities */}
                         <div>
@@ -267,55 +306,20 @@ export default function RoomDetailPage() {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-semibold">Đánh giá</h2>
-                                <div className="flex items-center gap-1">
-                                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                                    <span className="font-bold text-lg">{room.rating}</span>
-                                    <span className="text-muted-foreground">({room.reviewCount})</span>
-                                </div>
+                                {room.rating && (
+                                    <div className="flex items-center gap-1">
+                                        <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                                        <span className="font-bold text-lg">{room.rating}</span>
+                                        <span className="text-muted-foreground">({room.reviewCount || 0})</span>
+                                    </div>
+                                )}
                             </div>
 
-                            {reviews.length > 0 ? (
-                                <div className="space-y-4">
-                                    {reviews.map((review) => (
-                                        <Card key={review.id}>
-                                            <CardContent className="p-4">
-                                                <div className="flex items-start gap-3">
-                                                    <Avatar>
-                                                        <AvatarImage src={review.userAvatar} />
-                                                        <AvatarFallback>{review.userName[0]}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-between mb-1">
-                                                            <span className="font-medium">{review.userName}</span>
-                                                            <span className="text-sm text-muted-foreground">{review.createdAt}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 mb-2">
-                                                            {Array.from({ length: 5 }).map((_, i) => (
-                                                                <Star
-                                                                    key={i}
-                                                                    className={cn(
-                                                                        "h-3 w-3",
-                                                                        i < review.rating
-                                                                            ? "fill-yellow-400 text-yellow-400"
-                                                                            : "text-muted"
-                                                                    )}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                        <p className="text-muted-foreground">{review.comment}</p>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            ) : (
-                                <Card>
-                                    <CardContent className="p-8 text-center">
-                                        <p className="text-muted-foreground">Chưa có đánh giá nào</p>
-                                    </CardContent>
-                                </Card>
-                            )}
+                            <Card>
+                                <CardContent className="p-8 text-center">
+                                    <p className="text-muted-foreground">Chưa có đánh giá nào</p>
+                                </CardContent>
+                            </Card>
                         </div>
                     </div>
 
@@ -333,7 +337,7 @@ export default function RoomDetailPage() {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <Button asChild size="lg" className="w-full text-lg">
-                                        <Link href={`/rooms/${room.id}/booking`}>
+                                        <Link href={`/booking/${room.id}`}>
                                             <Calendar className="mr-2 h-5 w-5" />
                                             Đặt lịch xem phòng
                                         </Link>
@@ -355,11 +359,11 @@ export default function RoomDetailPage() {
                                     <div>
                                         <div className="flex items-center gap-3 mb-3">
                                             <Avatar className="h-12 w-12">
-                                                <AvatarImage src={room.ownerAvatar} />
-                                                <AvatarFallback>{room.ownerName[0]}</AvatarFallback>
+                                                <AvatarImage src={landlord.avatarUrl} />
+                                                <AvatarFallback>{landlord.fullName?.[0] || 'C'}</AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <div className="font-medium">{room.ownerName}</div>
+                                                <div className="font-medium">{landlord.fullName || 'Chủ nhà'}</div>
                                                 <div className="text-sm text-muted-foreground">Chủ nhà</div>
                                             </div>
                                         </div>
@@ -378,9 +382,9 @@ export default function RoomDetailPage() {
                                             <Building className="h-6 w-6 text-primary" />
                                         </div>
                                         <div>
-                                            <div className="font-medium">{room.propertyName}</div>
+                                            <div className="font-medium">{motel.name || 'Nhà trọ'}</div>
                                             <div className="text-sm text-muted-foreground">
-                                                {room.district}, {room.city}
+                                                {motel.district || motel.address || '---'}
                                             </div>
                                         </div>
                                     </div>

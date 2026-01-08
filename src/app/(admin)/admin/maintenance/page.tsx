@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,51 +22,74 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Wrench, Search, CheckCircle, Clock, AlertTriangle, User } from 'lucide-react';
-
-const mockRequests = [
-    { id: '1', title: 'Điều hòa không mát', room: 'Phòng A101', tenant: 'Nguyễn Văn A', priority: 'high', status: 'in_progress', createdAt: '25/12/2024', assignee: 'Kỹ thuật viên A' },
-    { id: '2', title: 'Vòi nước bị rỉ', room: 'Phòng B201', tenant: 'Trần Thị B', priority: 'medium', status: 'pending', createdAt: '27/12/2024', assignee: null },
-    { id: '3', title: 'Bóng đèn hỏng', room: 'Phòng C301', tenant: 'Lê Văn C', priority: 'low', status: 'completed', createdAt: '20/12/2024', assignee: 'Kỹ thuật viên B' },
-    { id: '4', title: 'Ống nước bể', room: 'Phòng A102', tenant: 'Phạm Thị D', priority: 'urgent', status: 'pending', createdAt: '28/12/2024', assignee: null },
-];
+import { Wrench, Search, CheckCircle, Clock, AlertTriangle, User, Loader2, MoreHorizontal, Trash2, Eye } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 export default function AdminMaintenancePage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const queryClient = useQueryClient();
 
-    const filteredRequests = mockRequests.filter(req => {
-        const matchesSearch = req.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            req.room.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            req.tenant.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
-        return matchesSearch && matchesStatus;
+    const { data: response, isLoading } = useQuery({
+        queryKey: ['maintenance-requests', statusFilter],
+        queryFn: () => api.getMaintenanceRequests(statusFilter !== 'all' ? { status: statusFilter } : undefined)
     });
+
+    const requests = response?.data || [];
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => api.deleteMaintenanceRequest(id),
+        onSuccess: () => {
+            toast.success('Đã xóa yêu cầu');
+            queryClient.invalidateQueries({ queryKey: ['maintenance-requests'] });
+        },
+        onError: () => toast.error('Lỗi khi xóa')
+    });
+
+    const handleDelete = (id: string) => {
+        if (confirm('Bạn có chắc chắn muốn xóa yêu cầu này không?')) {
+            deleteMutation.mutate(id);
+        }
+    };
+
+    const filteredRequests = Array.isArray(requests) ? requests.filter((req: any) => {
+        const matchesSearch = req.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            req.room?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            req.requestedBy?.fullName?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesSearch;
+    }) : [];
+
+    const pendingCount = Array.isArray(requests) ? requests.filter((r: any) => r.status === 'PENDING').length : 0;
+    const inProgressCount = Array.isArray(requests) ? requests.filter((r: any) => r.status === 'IN_PROGRESS').length : 0;
+    const completedCount = Array.isArray(requests) ? requests.filter((r: any) => r.status === 'COMPLETED').length : 0;
 
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'pending': return <Badge className="bg-yellow-500">Chờ xử lý</Badge>;
-            case 'in_progress': return <Badge className="bg-blue-500">Đang xử lý</Badge>;
-            case 'completed': return <Badge className="bg-green-500">Hoàn thành</Badge>;
+            case 'PENDING': return <Badge className="bg-yellow-500">Chờ xử lý</Badge>;
+            case 'IN_PROGRESS': return <Badge className="bg-blue-500">Đang xử lý</Badge>;
+            case 'COMPLETED': return <Badge className="bg-green-500">Hoàn thành</Badge>;
             default: return <Badge>{status}</Badge>;
         }
     };
 
     const getPriorityBadge = (priority: string) => {
         switch (priority) {
-            case 'low': return <Badge variant="outline">Thấp</Badge>;
-            case 'medium': return <Badge className="bg-yellow-500">Trung bình</Badge>;
-            case 'high': return <Badge className="bg-orange-500">Cao</Badge>;
-            case 'urgent': return <Badge className="bg-red-500">Khẩn cấp</Badge>;
+            case 'LOW': return <Badge variant="outline">Thấp</Badge>;
+            case 'MEDIUM': return <Badge className="bg-yellow-500">Trung bình</Badge>;
+            case 'HIGH': return <Badge className="bg-orange-500">Cao</Badge>;
+            case 'URGENT': return <Badge className="bg-red-500">Khẩn cấp</Badge>;
             default: return <Badge>{priority}</Badge>;
         }
     };
+
+    const formatDate = (date: string) => date ? new Date(date).toLocaleDateString('vi-VN') : '---';
 
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Quản lý sửa chữa</h1>
-                <p className="text-muted-foreground">Theo dõi và xử lý yêu cầu bảo trì</p>
+                <p className="text-muted-foreground">Theo dõi và xử lý yêu cầu bảo trì (API Real Data)</p>
             </div>
 
             {/* Stats */}
@@ -74,7 +99,7 @@ export default function AdminMaintenancePage() {
                         <Wrench className="h-10 w-10 text-blue-500" />
                         <div>
                             <p className="text-sm text-muted-foreground">Tổng yêu cầu</p>
-                            <p className="text-2xl font-bold">{mockRequests.length}</p>
+                            <p className="text-2xl font-bold">{Array.isArray(requests) ? requests.length : 0}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -83,7 +108,7 @@ export default function AdminMaintenancePage() {
                         <AlertTriangle className="h-10 w-10 text-yellow-500" />
                         <div>
                             <p className="text-sm text-muted-foreground">Chờ xử lý</p>
-                            <p className="text-2xl font-bold">{mockRequests.filter(r => r.status === 'pending').length}</p>
+                            <p className="text-2xl font-bold">{pendingCount}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -92,7 +117,7 @@ export default function AdminMaintenancePage() {
                         <Clock className="h-10 w-10 text-blue-500" />
                         <div>
                             <p className="text-sm text-muted-foreground">Đang xử lý</p>
-                            <p className="text-2xl font-bold">{mockRequests.filter(r => r.status === 'in_progress').length}</p>
+                            <p className="text-2xl font-bold">{inProgressCount}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -101,7 +126,7 @@ export default function AdminMaintenancePage() {
                         <CheckCircle className="h-10 w-10 text-green-500" />
                         <div>
                             <p className="text-sm text-muted-foreground">Hoàn thành</p>
-                            <p className="text-2xl font-bold">{mockRequests.filter(r => r.status === 'completed').length}</p>
+                            <p className="text-2xl font-bold">{completedCount}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -127,55 +152,62 @@ export default function AdminMaintenancePage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Tất cả</SelectItem>
-                                <SelectItem value="pending">Chờ xử lý</SelectItem>
-                                <SelectItem value="in_progress">Đang xử lý</SelectItem>
-                                <SelectItem value="completed">Hoàn thành</SelectItem>
+                                <SelectItem value="PENDING">Chờ xử lý</SelectItem>
+                                <SelectItem value="IN_PROGRESS">Đang xử lý</SelectItem>
+                                <SelectItem value="COMPLETED">Hoàn thành</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Tiêu đề</TableHead>
-                                <TableHead>Phòng</TableHead>
-                                <TableHead>Người yêu cầu</TableHead>
-                                <TableHead>Mức độ</TableHead>
-                                <TableHead>Người xử lý</TableHead>
-                                <TableHead>Trạng thái</TableHead>
-                                <TableHead>Ngày tạo</TableHead>
-                                <TableHead className="text-right">Thao tác</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredRequests.map((request) => (
-                                <TableRow key={request.id}>
-                                    <TableCell className="font-medium">{request.title}</TableCell>
-                                    <TableCell>{request.room}</TableCell>
-                                    <TableCell>{request.tenant}</TableCell>
-                                    <TableCell>{getPriorityBadge(request.priority)}</TableCell>
-                                    <TableCell>
-                                        {request.assignee ? (
-                                            <div className="flex items-center gap-1">
-                                                <User className="h-4 w-4" />
-                                                {request.assignee}
-                                            </div>
-                                        ) : (
-                                            <span className="text-muted-foreground">Chưa phân công</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>{getStatusBadge(request.status)}</TableCell>
-                                    <TableCell>{request.createdAt}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="outline" size="sm">
-                                            Xử lý
-                                        </Button>
-                                    </TableCell>
+                    {isLoading ? (
+                        <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Tiêu đề</TableHead>
+                                    <TableHead>Phòng</TableHead>
+                                    <TableHead>Người yêu cầu</TableHead>
+                                    <TableHead>Mức độ</TableHead>
+                                    <TableHead>Trạng thái</TableHead>
+                                    <TableHead>Ngày tạo</TableHead>
+                                    <TableHead className="text-right">Thao tác</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredRequests.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center p-4">Không có dữ liệu</TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredRequests.map((request: any) => (
+                                        <TableRow key={request.id}>
+                                            <TableCell className="font-medium">{request.title}</TableCell>
+                                            <TableCell>{request.room?.name || '---'}</TableCell>
+                                            <TableCell>{request.requestedBy?.fullName || '---'}</TableCell>
+                                            <TableCell>{getPriorityBadge(request.priority)}</TableCell>
+                                            <TableCell>{getStatusBadge(request.status)}</TableCell>
+                                            <TableCell>{formatDate(request.createdAt)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem><Eye className="h-4 w-4 mr-2" />Xem</DropdownMenuItem>
+                                                        <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(request.id)}>
+                                                            <Trash2 className="h-4 w-4 mr-2" />Xóa
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    )}
                 </CardContent>
             </Card>
         </div>
