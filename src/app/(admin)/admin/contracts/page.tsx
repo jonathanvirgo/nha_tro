@@ -91,7 +91,9 @@ export default function AdminContractsPage() {
     });
 
     const contracts = response?.data || [];
-    const rooms = Array.isArray(roomsResponse?.data) ? roomsResponse.data : [];
+    // API trả về { success: true, data: { rooms: [...] } }
+    const roomsData = roomsResponse?.data as { rooms?: unknown[] } | undefined;
+    const rooms = Array.isArray(roomsData?.rooms) ? roomsData.rooms : [];
     const tenants = Array.isArray(tenantsResponse?.data) ? tenantsResponse.data : [];
 
     const createMutation = useMutation({

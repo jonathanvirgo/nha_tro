@@ -17,6 +17,11 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
     return new Intl.NumberFormat('vi-VN').format(price);
   };
 
+  // Handle both API (utilities) and mockData (amenities) formats
+  const amenities: string[] = (room as any).utilities || (room as any).amenities || [];
+  const images: string[] = room.images || [];
+  const isAvailable = room.isAvailable !== false; // Default to true if not specified
+
   if (variant === 'horizontal') {
     return (
       <Card className="group overflow-hidden hover-lift animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
@@ -24,7 +29,7 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
           {/* Image */}
           <div className="relative w-full md:w-72 h-48 md:h-auto shrink-0">
             <img
-              src={room.images[0]}
+              src={images[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800'}
               alt={room.name}
               className="w-full h-full object-cover"
             />
@@ -35,7 +40,7 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
             >
               <Heart className="h-4 w-4" />
             </Button>
-            {room.isAvailable ? (
+            {isAvailable ? (
               <Badge className="absolute top-2 left-2 bg-success text-success-foreground">
                 Còn trống
               </Badge>
@@ -78,14 +83,14 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 mb-4">
-                  {room.amenities.slice(0, 4).map((amenity, i) => (
+                  {amenities.slice(0, 4).map((amenity, i) => (
                     <Badge key={i} variant="secondary" className="text-xs font-normal">
                       {amenity}
                     </Badge>
                   ))}
-                  {room.amenities.length > 4 && (
+                  {amenities.length > 4 && (
                     <Badge variant="outline" className="text-xs font-normal">
-                      +{room.amenities.length - 4}
+                      +{amenities.length - 4}
                     </Badge>
                   )}
                 </div>
@@ -117,7 +122,7 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden">
         <img
-          src={room.images[0]}
+          src={images[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800'}
           alt={room.name}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
@@ -128,7 +133,7 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
         >
           <Heart className="h-4 w-4" />
         </Button>
-        {room.isAvailable ? (
+        {isAvailable ? (
           <Badge className="absolute top-2 left-2 bg-success text-success-foreground">
             Còn trống
           </Badge>
@@ -153,7 +158,7 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
 
         <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
-          <span className="line-clamp-1">{room.district}, {room.city}</span>
+          <span className="line-clamp-1">{(room as any).motel?.district || room.district}, {(room as any).motel?.province || room.city}</span>
         </div>
 
         <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
@@ -168,14 +173,14 @@ export function RoomCard({ room, index = 0, variant = 'default' }: RoomCardProps
         </div>
 
         <div className="flex flex-wrap gap-1 mb-4">
-          {room.amenities.slice(0, 3).map((amenity, i) => (
+          {amenities.slice(0, 3).map((amenity, i) => (
             <Badge key={i} variant="secondary" className="text-xs font-normal">
               {amenity}
             </Badge>
           ))}
-          {room.amenities.length > 3 && (
+          {amenities.length > 3 && (
             <Badge variant="outline" className="text-xs font-normal">
-              +{room.amenities.length - 3}
+              +{amenities.length - 3}
             </Badge>
           )}
         </div>

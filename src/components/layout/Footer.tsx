@@ -1,75 +1,171 @@
+"use client";
+
 import Link from 'next/link';
-import { Home, Phone, Mail, MapPin, Facebook, Youtube } from 'lucide-react';
+import { Home, Facebook, Mail, Phone, MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export function Footer() {
+  const currentYear = new Date().getFullYear();
+
+  const aboutLinks = [
+    { href: '/about', label: 'Về chúng tôi' },
+    { href: '/team', label: 'Đội ngũ' },
+    { href: '/careers', label: 'Tuyển dụng' },
+    { href: '/press', label: 'Báo chí' },
+  ];
+
+  const guideLinks = [
+    { href: '/guide/search', label: 'Hướng dẫn tìm phòng' },
+    { href: '/guide/booking', label: 'Đặt lịch xem phòng' },
+    { href: '/guide/contract', label: 'Ký hợp đồng' },
+    { href: '/guide/payment', label: 'Thanh toán' },
+  ];
+
+  const policyLinks = [
+    { href: '/privacy', label: 'Chính sách bảo mật' },
+    { href: '/terms', label: 'Điều khoản sử dụng' },
+    { href: '/refund', label: 'Chính sách hoàn tiền' },
+    { href: '/support', label: 'Trung tâm hỗ trợ' },
+  ];
+
+  const socialLinks = [
+    { href: 'https://facebook.com', label: 'Facebook', icon: Facebook },
+    { href: 'https://zalo.me', label: 'Zalo', icon: Phone },
+    { href: 'mailto:contact@nhatro.vn', label: 'Email', icon: Mail },
+  ];
+
   return (
-    <footer className="bg-gray-900 text-white">
-      <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-lg font-bold">N</span>
+    <footer className="bg-muted/30 border-t border-border">
+      {/* Main Footer Content */}
+      <div className="container py-12 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
+          {/* Brand Section */}
+          <div className="lg:col-span-2">
+            <Link href="/" className="flex items-center gap-2 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-blue-500">
+                <Home className="h-6 w-6 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold">NhaTro</span>
+              <span className="font-bold text-2xl gradient-text">NhaTro</span>
             </Link>
-            <p className="text-gray-400 text-sm">
-              Nền tảng tìm kiếm và quản lý nhà trọ hàng đầu Việt Nam.
+            <p className="text-muted-foreground mb-6 max-w-sm">
+              Nền tảng tìm kiếm và đặt lịch xem phòng trọ số 1 Việt Nam.
+              Giúp bạn tìm được nơi ở ưng ý một cách nhanh chóng và tiện lợi.
             </p>
-            <div className="flex gap-4">
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white">
-                <Youtube className="h-5 w-5" />
-              </a>
+
+            {/* Newsletter */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Đăng ký nhận tin</h4>
+              <div className="flex gap-2 max-w-sm">
+                <Input
+                  type="email"
+                  placeholder="Email của bạn"
+                  className="flex-1"
+                />
+                <Button className="gradient-primary shrink-0">Đăng ký</Button>
+              </div>
             </div>
           </div>
 
-          {/* Links */}
+          {/* About Links */}
           <div>
-            <h3 className="font-semibold mb-4">Liên kết</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link href="/" className="hover:text-white">Trang chủ</Link></li>
-              <li><Link href="/rooms" className="hover:text-white">Tìm phòng</Link></li>
-              <li><Link href="/map" className="hover:text-white">Bản đồ</Link></li>
-              <li><Link href="/contact" className="hover:text-white">Liên hệ</Link></li>
+            <h4 className="font-semibold mb-4">Về chúng tôi</h4>
+            <ul className="space-y-3">
+              {aboutLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Services */}
+          {/* Guide Links */}
           <div>
-            <h3 className="font-semibold mb-4">Dịch vụ</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link href="/landlord" className="hover:text-white">Đăng phòng</Link></li>
-              <li><Link href="/tenant" className="hover:text-white">Quản lý thuê</Link></li>
-              <li><Link href="/pricing" className="hover:text-white">Bảng giá</Link></li>
+            <h4 className="font-semibold mb-4">Hướng dẫn</h4>
+            <ul className="space-y-3">
+              {guideLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Policy Links */}
           <div>
-            <h3 className="font-semibold mb-4">Liên hệ</h3>
-            <ul className="space-y-3 text-sm text-gray-400">
-              <li className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 mt-0.5" />
-                <span>123 Đường ABC, Quận 1, TP.HCM</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                <span>1900 xxxx</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                <span>contact@nhatro.vn</span>
-              </li>
+            <h4 className="font-semibold mb-4">Chính sách</h4>
+            <ul className="space-y-3">
+              {policyLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
+      </div>
 
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>© {new Date().getFullYear()} NhaTro. All rights reserved.</p>
+      {/* Contact Info & Social */}
+      <div className="border-t border-border">
+        <div className="container py-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Contact Info */}
+            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
+                <span>Hotline: 1900 xxxx</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                <span>contact@nhatro.vn</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                <span>TP. Hồ Chí Minh, Việt Nam</span>
+              </div>
+            </div>
+
+            {/* Social Links */}
+            <div className="flex items-center gap-2">
+              {socialLinks.map((link) => (
+                <Button
+                  key={link.href}
+                  variant="ghost"
+                  size="icon"
+                  asChild
+                  className="hover:text-primary"
+                >
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" aria-label={link.label}>
+                    <link.icon className="h-5 w-5" />
+                  </a>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Copyright */}
+      <div className="border-t border-border bg-muted/50">
+        <div className="container py-4">
+          <p className="text-center text-sm text-muted-foreground">
+            © {currentYear} NhaTro. Tất cả quyền được bảo lưu.
+          </p>
         </div>
       </div>
     </footer>

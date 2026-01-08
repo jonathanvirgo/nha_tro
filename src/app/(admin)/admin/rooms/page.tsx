@@ -81,7 +81,9 @@ export default function RoomsPage() {
         queryFn: () => api.getMotels()
     });
 
-    const rooms = response?.data || [];
+    // API trả về { success: true, data: { rooms: [...] } }
+    const responseData = response?.data as { rooms?: unknown[] } | undefined;
+    const rooms = Array.isArray(responseData?.rooms) ? responseData.rooms : [];
     const motels = Array.isArray(motelsResponse?.data) ? motelsResponse.data : [];
 
     const createMutation = useMutation({

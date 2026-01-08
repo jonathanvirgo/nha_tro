@@ -100,29 +100,48 @@ function MapPageContent() {
     const [isLocating, setIsLocating] = useState(false);
     const [isMapReady, setIsMapReady] = useState(false);
 
-    // Fetch motels từ API
+    // Fetch rooms từ public API và group theo motel
     const { data: response, isLoading: isLoadingMotels } = useQuery({
-        queryKey: ['map-motels'],
-        queryFn: () => api.getMotels(),
+        queryKey: ['map-rooms'],
+        queryFn: () => api.searchRooms({ limit: '100' }),
         staleTime: 60000,
     });
 
-    // Convert motel data to Property format with default coords for HCM
+    // Convert rooms data to Property format grouped by motel
     const properties: Property[] = useMemo(() => {
-        const motels = Array.isArray(response?.data) ? response.data : [];
-        return motels.map((motel: any, index: number) => ({
-            id: motel.id,
-            name: motel.name,
-            address: motel.address || '',
-            district: motel.district || '',
-            // Generate random coords around HCM city for demo (since API may not have coords)
-            latitude: motel.latitude || (10.7769 + (Math.random() - 0.5) * 0.1),
-            longitude: motel.longitude || (106.6927 + (Math.random() - 0.5) * 0.1),
-            rating: motel.averageRating || 4.5,
-            availableRooms: motel.rooms?.filter((r: any) => r.status === 'AVAILABLE').length || 0,
-            images: motel.images || [],
-            rooms: motel.rooms || [],
-        }));
+        // API trả về { success: true, data: { rooms: [...] } }
+        const roomsData = response?.data as { rooms?: any[] } | undefined;
+        const rooms = Array.isArray(roomsData?.rooms) ? roomsData.rooms : [];
+
+        // Group rooms by motel
+        const motelMap = new Map<string, Property>();
+
+        rooms.forEach((room: any) => {
+            const motel = room.motel;
+            if (!motel) return;
+
+            const existingProperty = motelMap.get(motel.id);
+            if (existingProperty) {
+                existingProperty.rooms?.push(room);
+                existingProperty.availableRooms = (existingProperty.availableRooms || 0) + 1;
+            } else {
+                motelMap.set(motel.id, {
+                    id: motel.id,
+                    name: motel.name || 'Nhà trọ',
+                    address: motel.address || '',
+                    district: motel.district || motel.province || '',
+                    // Generate random coords around HCM city for demo (since API may not have coords)
+                    latitude: motel.latitude || (10.7769 + (Math.random() - 0.5) * 0.1),
+                    longitude: motel.longitude || (106.6927 + (Math.random() - 0.5) * 0.1),
+                    rating: room.rating || 4.5,
+                    availableRooms: 1,
+                    images: room.images || [],
+                    rooms: [room],
+                });
+            }
+        });
+
+        return Array.from(motelMap.values());
     }, [response]);
 
     const filteredProperties = useMemo(() => properties.filter((property: Property) => {
@@ -374,7 +393,7 @@ function MapPageContent() {
                                                 <Card key={property.id} className="cursor-pointer hover:border-primary/50" onClick={() => handlePropertyClick(property)}>
                                                     <CardContent className="p-3">
                                                         <div className="flex gap-3">
-                                                            <img src={property.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200'} alt={property.name} className="w-20 h-20 rounded-lg object-cover" />
+                                                            <img src={property.images?.[0] || property.rooms?.[0]?.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200'} alt={property.name} className="w-20 h-20 rounded-lg object-cover" />
                                                             <div className="flex-1 min-w-0">
                                                                 <h4 className="font-medium text-sm line-clamp-1">{property.name}</h4>
                                                                 <p className="text-xs text-muted-foreground line-clamp-1">{property.district}</p>
@@ -416,7 +435,7 @@ function MapPageContent() {
                             </Button>
 
                             <div className="flex">
-                                <img src={selectedProperty.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200'} alt={selectedProperty.name} className="w-32 h-32 object-cover rounded-l-lg" />
+                                <img src={selectedProperty.images?.[0] || selectedProperty.rooms?.[0]?.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200'} alt={selectedProperty.name} className="w-32 h-32 object-cover rounded-l-lg" />
                                 <div className="flex-1 p-3">
                                     <Badge className="mb-1 bg-green-500 text-xs">{selectedProperty.availableRooms} phòng trống</Badge>
                                     <h3 className="font-semibold text-sm line-clamp-1">{selectedProperty.name}</h3>

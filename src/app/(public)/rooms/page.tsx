@@ -79,7 +79,9 @@ function RoomsPageContent() {
         staleTime: 30000, // Cache for 30 seconds
     });
 
-    const rooms = response?.data || [];
+    // API trả về { success: true, data: { rooms: [...] } }
+    const responseData = response?.data as { rooms?: unknown[] } | undefined;
+    const rooms = Array.isArray(responseData?.rooms) ? responseData.rooms : [];
 
     const formatPrice = (price: number) => {
         if (price >= 1000000) {

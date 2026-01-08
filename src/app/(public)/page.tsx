@@ -38,44 +38,44 @@ const districts = [
 ];
 
 const statistics = {
-    totalRooms: 5000,
-    totalUsers: 10000,
-    totalBookings: 15000,
+    totalRooms: 15000,
+    totalUsers: 50000,
+    totalBookings: 120000,
     cities: 20,
 };
 
 const mockTestimonials = [
     {
         id: '1',
-        name: 'Nguyễn Văn An',
-        role: 'Sinh viên',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-        content: 'Tìm được phòng trọ gần trường rất nhanh chóng. Giao diện dễ sử dụng, thông tin phòng đầy đủ và chính xác.',
+        name: 'Nguyễn Văn Hùng',
+        role: 'Sinh viên ĐH Bách Khoa',
+        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+        content: 'Tìm được phòng trọ ưng ý chỉ trong 2 ngày nhờ NhaTro. Giao diện dễ sử dụng, thông tin chi tiết. Rất recommend!',
         rating: 5,
     },
     {
         id: '2',
-        name: 'Trần Thị Bình',
+        name: 'Trần Thị Lan',
         role: 'Nhân viên văn phòng',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-        content: 'Đặt lịch xem phòng online rất tiện lợi, không cần gọi điện nhiều lần. Chủ nhà phản hồi nhanh.',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        content: 'Đặt lịch xem phòng online rất tiện lợi, không cần gọi điện nhiều. Tiết kiệm thời gian đi lại rất nhiều.',
         rating: 5,
     },
     {
         id: '3',
-        name: 'Lê Văn Cường',
-        role: 'Kỹ sư phần mềm',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
-        content: 'So sánh nhiều phòng cùng lúc giúp tôi đưa ra quyết định tốt hơn. Rất hài lòng với trải nghiệm.',
-        rating: 4,
+        name: 'Phạm Minh Đức',
+        role: 'Chủ nhà trọ',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+        content: 'Quản lý nhà trọ dễ dàng hơn rất nhiều. Thu tiền, quản lý hợp đồng, tất cả đều tự động. Tuyệt vời!',
+        rating: 5,
     },
     {
         id: '4',
-        name: 'Phạm Thị Dung',
-        role: 'Chủ nhà trọ',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
-        content: 'Đăng tin cho thuê phòng rất dễ dàng. Có nhiều người liên hệ xem phòng hơn so với các kênh khác.',
-        rating: 5,
+        name: 'Lê Hoàng Anh',
+        role: 'Freelancer',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        content: 'Bản đồ tìm phòng giúp tôi tìm được chỗ ở gần quán cafe yêu thích. Rất tiện cho người làm việc tự do!',
+        rating: 4,
     },
 ];
 
@@ -110,11 +110,15 @@ export default function LandingPage() {
     // Fetch API real data cho featured rooms
     const { data: response, isLoading } = useQuery({
         queryKey: ['featured-rooms'],
-        queryFn: () => api.searchRooms({ limit: '4', status: 'AVAILABLE' }),
+        queryFn: () => api.searchRooms({ limit: '4' }),
         staleTime: 60000, // Cache for 1 minute
     });
 
-    const featuredRooms = Array.isArray(response?.data) ? response.data.slice(0, 4) : [];
+    // API trả về { success: true, data: { rooms: [...] } }
+    const responseData = response?.data as { rooms?: unknown[] } | undefined;
+    const featuredRooms = Array.isArray(responseData?.rooms)
+        ? responseData.rooms.slice(0, 4)
+        : [];
 
     return (
         <div className="flex flex-col">
@@ -184,7 +188,7 @@ export default function LandingPage() {
                             </div>
 
                             <div className="mt-4 flex flex-col sm:flex-row gap-4">
-                                <Button asChild size="lg" className="flex-1 h-12 text-lg font-semibold">
+                                <Button asChild size="lg" className="flex-1 h-12 text-lg font-semibold gradient-primary">
                                     <Link href="/rooms">
                                         <Search className="mr-2 h-5 w-5" />
                                         Tìm phòng ngay
@@ -407,7 +411,7 @@ export default function LandingPage() {
                                     Đăng ký ngay
                                 </Link>
                             </Button>
-                            <Button asChild size="lg" variant="outline" className="text-lg font-semibold border-white/30 text-white hover:bg-white/10">
+                            <Button asChild size="lg" variant="outline" className="text-lg font-semibold bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
                                 <Link href="/rooms">
                                     <Building className="mr-2 h-5 w-5" />
                                     Xem phòng trọ
